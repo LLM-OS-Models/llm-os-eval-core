@@ -105,10 +105,12 @@ TESTS: [...]
             test_recall = 1.0 if pred_tests else 0.0
         result.metric_values["test_plan_recall"] = test_recall
 
-        result.final_success = recall > 0 and test_recall > 0
+        result.final_success = recall > 0 and test_recall > 0 and has_patch > 0
         if not result.final_success:
             if recall == 0:
                 result.failure_stage = "file_selection"
+            elif has_patch == 0:
+                result.failure_stage = "patch_generation"
             elif test_recall == 0:
                 result.failure_stage = "test_planning"
             else:

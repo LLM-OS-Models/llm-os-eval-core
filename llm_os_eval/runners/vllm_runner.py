@@ -7,6 +7,8 @@ class VLLMRunner(BaseRunner):
     def __init__(self, base_url: str, model_name: str):
         self.base_url = base_url.rstrip("/")
         self.model_name = model_name
+        if not self.base_url.endswith("/v1"):
+            self.base_url += "/v1"
 
     def generate(self, system_prompt, user_prompt, tools=None, max_tokens=1024, temperature=0.0):
         payload = {
@@ -22,7 +24,7 @@ class VLLMRunner(BaseRunner):
             payload["tools"] = tools
 
         t0 = time.time()
-        resp = httpx.post(f"{self.base_url}/v1/chat/completions", json=payload, timeout=300.0)
+        resp = httpx.post(f"{self.base_url}/chat/completions", json=payload, timeout=300.0)
         resp.raise_for_status()
         data = resp.json()
         dt = int((time.time() - t0) * 1000)

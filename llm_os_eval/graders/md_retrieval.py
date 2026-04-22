@@ -42,16 +42,18 @@ class MDRetrievalEvaluator(BaseEvaluator):
         doc_list = "\n".join(
             f"- {d['doc_id']}: {d['path']}" for d in sample.artifacts.get("documents", [])
         )
-        system_prompt = "너는 MD 문서 검색과 근거 기반 응답을 수행하는 평가용 어시스턴트다."
+        system_prompt = "너는 MD 문서 검색과 근거 기반 응답을 수행하는 평가용 어시스턴트다. 사고 과정 없이 바로 최종 답변만 출력하라."
         user_prompt = f"""질문:
 {sample.user_query}
 
 문서 목록:
 {doc_list}
 
-반드시 다음 형식으로 답하라:
-DOC_IDS: [...]
-ANSWER: ...
+반드시 다음 형식으로만 답하라 (다른 텍스트는 출력하지 마라):
+DOC_IDS: [doc_id1, doc_id2]
+ANSWER: 질문에 대한 답변
+
+주의: DOC_IDS에는 문서 목록의 정확한 doc_id를 사용하라. ANSWER에는 문서에서 찾은 근거를 포함하라.
 """
         return system_prompt, user_prompt
 

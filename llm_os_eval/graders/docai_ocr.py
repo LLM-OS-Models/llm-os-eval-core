@@ -59,12 +59,12 @@ class DocAIOCREvaluator(BaseEvaluator):
             table_hits = sum(1 for h in gold_table if h.lower() in text.lower())
             table_acc = table_hits / len(gold_table) if gold_table else 0.0
         else:
-            table_acc = 1.0
+            table_acc = 0.0
         result.metric_values["table_parse_accuracy"] = table_acc
 
         overall = 0.6 * field_acc + 0.4 * table_acc
         result.metric_values["document_understanding_accuracy"] = overall
-        result.final_success = field_acc > 0.5
+        result.final_success = overall > 0.5
         if not result.final_success:
             result.failure_stage = "document_understanding"
         return result

@@ -10,13 +10,22 @@ from llm_os_eval.schemas.result import EvalResult
 
 def _extract_sql(text: str) -> str:
     sql = text.strip()
-    fence_match = re.search(r"```(?:sql)?\s*(.*?)```", sql, re.DOTALL)
+    # Try fenced code block first (most reliable)
+    fence_match = re.search(r"```(?:sql)?\s*\n?(.*?)```", sql, re.DOTALL)
     if fence_match:
         sql = fence_match.group(1).strip()
-    for prefix in ("SELECT", "select", "Select", "WITH", "with", "INSERT", "UPDATE", "DELETE"):
-        idx = sql.upper().find(prefix)
-        if idx >= 0:
-            sql = sql[idx:]
+    else:
+        # Only search for SQL keywords after the last newline that starts a SQL-looking line
+        # to avoid matching "select" in reasoning text
+        for line in sql.split("\n"):
+            stripped = line.strip()
+            for kw in ("SELECT", "WITH", "INSERT", "UPDATE", "DELETE"):
+                if stripped.upper().startswith(kw):
+                    idx = sql.find(line)
+                    sql = sql[idx:]
+                    break
+            else:
+                continue
             break
     sql = sql.rstrip(";").strip()
     return sql
@@ -63,13 +72,15 @@ SQL 한 개만 출력
             return result
 
         result.metric_values["parse_success"] = 1.0
+        result.metric_values["schema_link_error"] = 0.0
 
-        for pattern in gold_sql_patterns:
-            if re.search(pattern, sql, re.IGNORECASE):
-                result.metric_values["schema_link_error"] = 0.0
-                break
-        else:
-            if gold_sql_patterns:
+        if gold_sql_patterns:
+            matched = False
+            for pattern in gold_sql_patterns:
+                if re.search(pattern, sql, re.IGNORECASE):
+                    matched = True
+                    break
+            if not matched:
                 result.metric_values["schema_link_error"] = 1.0
 
         if not db_path:

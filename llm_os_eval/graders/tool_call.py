@@ -76,27 +76,43 @@ class ToolCallEvaluator(BaseEvaluator):
             result.final_success = False
             return result
 
-        selection_ok = 1.0 if predicted[0].get("name") == gold_calls[0].get("name") else 0.0
+        # Grade ALL tool calls, not just the first one
+        n_gold = len(gold_calls)
+        selection_hits = 0
+        total_arg_score = 0.0
+        total_schema_ok = 0.0
+
+        for i, gold_call in enumerate(gold_calls):
+            if i < len(predicted):
+                pred_call = predicted[i]
+                if pred_call.get("name") == gold_call.get("name"):
+                    selection_hits += 1
+
+                gold_args = gold_call.get("arguments", {})
+                pred_args = pred_call.get("arguments", {}) or {}
+                if gold_args:
+                    matching = sum(1 for k, v in gold_args.items() if str(pred_args.get(k, "")) == str(v))
+                    total_arg_score += matching / len(gold_args)
+                else:
+                    total_arg_score += 1.0
+
+                if gold_tools_schema:
+                    try:
+                        schema = gold_tools_schema if isinstance(gold_tools_schema, dict) else {"type": "object", "properties": gold_tools_schema}
+                        jsonschema.validate(instance=pred_args, schema=schema)
+                        total_schema_ok += 1.0
+                    except jsonschema.ValidationError:
+                        pass
+                else:
+                    total_schema_ok += 1.0
+
+        selection_ok = selection_hits / n_gold if n_gold > 0 else 0.0
+        arg_score = total_arg_score / n_gold if n_gold > 0 else 0.0
+        schema_ok = total_schema_ok / n_gold if n_gold > 0 else 0.0
+
         result.metric_values["tool_selection_accuracy"] = selection_ok
-
-        gold_args = gold_calls[0].get("arguments", {})
-        pred_args = predicted[0].get("arguments", {})
-        if gold_args:
-            matching = sum(1 for k, v in gold_args.items() if str(pred_args.get(k, "")) == str(v))
-            arg_score = matching / len(gold_args)
-        else:
-            arg_score = 1.0 if not pred_args else 0.5
         result.metric_values["argument_validity"] = arg_score
-
-        if gold_tools_schema:
-            try:
-                schema = gold_tools_schema if isinstance(gold_tools_schema, dict) else {"type": "object", "properties": gold_tools_schema}
-                jsonschema.validate(instance=pred_args, schema=schema)
-                result.metric_values["schema_validity"] = 1.0
-            except jsonschema.ValidationError:
-                result.metric_values["schema_validity"] = 0.0
-        else:
-            result.metric_values["schema_validity"] = 1.0
+        result.metric_values["schema_validity"] = schema_ok
 
         task_ok = 1.0 if selection_ok > 0 and arg_score >= 0.5 else 0.0
         result.metric_values["task_success"] = task_ok
