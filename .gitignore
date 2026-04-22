@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.python-version
+
+# uv
+# Choose org-wide policy later for uv.lock
+# uv.lock
+
+# notebooks
+.ipynb_checkpoints/
+
+# outputs
+logs/
+results/
+outputs/
+checkpoints/
+wandb/
+mlruns/
+
+# datasets / artifacts
+dataset/
+datasets/
+artifacts/
+repos/
+documents/
+db/
+corpus/
+
+# system
+.DS_Store
+.env
