@@ -26,7 +26,6 @@ dev = [
 ]
 
 [tool.uv]
-no-binary = []
 
 [project.scripts]
 llm-os-eval = "llm_os_eval.cli:app"
