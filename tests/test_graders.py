@@ -55,7 +55,7 @@ class TestCodingAgentEvaluator:
         result = EvalResult(
             run_id="r1", sample_id="code_001", task_type="coding_agent",
             model_name="test", checkpoint_name="base", prompt_version="v1",
-            raw_output="FILES: [auth.py]\nTESTS: [tests/test_login.py]",
+            raw_output="FILES: [auth.py]\nPATCH:\n```diff\n--- a/auth.py\n+++ b/auth.py\n@@ -1 +1 @@\n-old\n+new\n```\nTESTS: [tests/test_login.py]",
         )
         graded = self.evaluator.grade(self.sample, result)
         assert graded.final_success is True
@@ -74,7 +74,7 @@ class TestCodingAgentEvaluator:
 
     def test_run_one(self):
         self.runner.generate.return_value = {
-            "text": "FILES: [auth.py]\nTESTS: [tests/test_login.py]",
+            "text": "FILES: [auth.py]\nPATCH:\n```diff\n--- a/auth.py\n+++ b/auth.py\n@@ -1 +1 @@\n-old\n+new\n```\nTESTS: [tests/test_login.py]",
             "tool_calls": [], "latency_ms": 100, "input_tokens": 10, "output_tokens": 20,
         }
         result = self.evaluator.run_one(self.sample)
@@ -102,7 +102,7 @@ class TestText2SQLEvaluator:
     def test_build_prompt(self):
         sys_prompt, user_prompt = self.evaluator.build_prompt(self.sample)
         assert "환불률" in user_prompt
-        assert "db/test.sqlite" in user_prompt
+        assert "schema.md" in user_prompt
 
     def test_grade_parse_success(self):
         result = EvalResult(
@@ -214,8 +214,8 @@ class TestMDRetrievalEvaluator:
             difficulty="medium",
             user_query="배포 절차 설명",
             artifacts={"documents": [
-                {"doc_id": "doc_a", "path": "docs/deploy.md"},
-                {"doc_id": "doc_b", "path": "docs/api.md"},
+                {"doc_id": "doc_a", "path": "docs/deploy.md", "content": "배포 절차는 다음과 같다. 코드 빌드 후 테스트를 거쳐 배포한다."},
+                {"doc_id": "doc_b", "path": "docs/api.md", "content": "API 사용법 안내"},
             ]},
             gold={"relevant_doc_ids": ["doc_a"]},
         )

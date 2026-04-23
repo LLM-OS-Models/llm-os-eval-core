@@ -32,12 +32,12 @@ llm_os_eval/
 
 | task_type | 그레이더 | 핵심 메트릭 | 성공 조건 |
 |-----------|---------|------------|----------|
-| `md_retrieval` | MDRetrievalEvaluator | file_hit_at_1/3, span_recall, answer_f1 | hit_at_3>0 AND span_recall>=0.5 |
+| `md_retrieval` | MDRetrievalEvaluator | file_hit_at_1/3, span_recall, answer_f1, faithfulness | hit_at_3>0 AND span_recall>=0.5 AND faithfulness>=0.5 |
 | `tool_call` | ToolCallEvaluator | tool_selection_accuracy, argument_validity, schema_validity, task_success | selection>0 AND arg_score>=0.5 |
-| `text2sql` | Text2SQLEvaluator | parse_success, schema_link_error, execution_success, result_accuracy | SQL 실행 성공 AND 결과 일치 |
-| `coding_agent` | CodingAgentEvaluator | file_selection_recall, patch_present, test_plan_recall | recall>0 AND test_recall>0 AND patch_present>0 |
+| `text2sql` | Text2SQLEvaluator | parse_success, schema_link_error, execution_success, result_accuracy, result_f1 | SQL 실행 성공 AND result_f1>=0.8 |
+| `coding_agent` | CodingAgentEvaluator | file_selection_recall, patch_present, test_plan_recall (fuzzy matching, threshold=0.6) | recall>0 AND test_recall>0 AND patch_present>0 |
 | `docai_ocr` | DocAIOCREvaluator | field_extraction_accuracy, table_parse_accuracy, document_understanding_accuracy | 0.6*field+0.4*table > 0.5 |
-| `deep_research` | DeepResearchEvaluator | answer_accuracy, citation_support | answer_accuracy>=0.5 AND citation_support>0 |
+| `deep_research` | DeepResearchEvaluator | answer_accuracy, citation_support (multi-query decomposition, max 8 deduplicated results) | answer_accuracy>=0.5 AND citation_support>0 |
 | `terminal` | TerminalEvaluator | command_plan_present, command_count, cmd_overlap | — |
 
 ## 그레이더 파이프라인

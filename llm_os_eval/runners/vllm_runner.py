@@ -17,7 +17,7 @@ class VLLMRunner(BaseRunner):
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
-            "max_tokens": max_tokens,
+            "max_tokens": max_tokens or 2048,
             "temperature": temperature,
         }
         if tools:

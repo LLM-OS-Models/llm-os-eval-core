@@ -12,11 +12,14 @@ def _field_match(gold_value: str, pred_text: str, match_type: str = "contains") 
         return 1.0 if gold_str in pred_text else 0.0
     gold_lower = gold_str.lower()
     pred_lower = pred_text.lower()
+    # Exact substring match (full credit)
     if gold_lower in pred_lower:
         return 1.0
+    # Digit-only match for numbers (partial credit)
     gold_digits = re.sub(r"[^\d]", "", gold_str)
     if gold_digits and gold_digits in pred_text:
         return 0.8
+    # Word-level overlap for multi-word values
     gold_words = set(gold_lower.split())
     if len(gold_words) > 1:
         overlap = sum(1 for w in gold_words if w in pred_lower) / len(gold_words)
@@ -28,12 +31,18 @@ class DocAIOCREvaluator(BaseEvaluator):
     task_type = "docai_ocr"
 
     def build_prompt(self, sample: EvalSample) -> tuple[str, str]:
-        system_prompt = "너는 문서 OCR/이해 평가용 모델이다."
-        user_prompt = f"""문서:
-{sample.artifacts.get('document_path')}
+        system_prompt = "너는 문서 OCR/이해 평가용 모델이다. 주어진 문서 텍스트에서 요청된 정보를 정확히 추출하라."
+        doc_content = sample.artifacts.get("document_content", "")
+        if doc_content:
+            doc_section = f"문서 텍스트:\n{doc_content}"
+        else:
+            doc_section = f"문서 경로: {sample.artifacts.get('document_path', 'N/A')}"
+        user_prompt = f"""{doc_section}
 
 질문:
 {sample.user_query}
+
+반드시 문서에서 확인한 구체적인 값으로 답하라.
 """
         return system_prompt, user_prompt
 
@@ -58,13 +67,17 @@ class DocAIOCREvaluator(BaseEvaluator):
         if gold_table:
             table_hits = sum(1 for h in gold_table if h.lower() in text.lower())
             table_acc = table_hits / len(gold_table) if gold_table else 0.0
+            # If field extraction is perfect, table header check is secondary
+            if field_acc >= 1.0:
+                overall = field_acc
+            else:
+                overall = 0.6 * field_acc + 0.4 * table_acc
         else:
             table_acc = 0.0
+            overall = field_acc
         result.metric_values["table_parse_accuracy"] = table_acc
-
-        overall = 0.6 * field_acc + 0.4 * table_acc
         result.metric_values["document_understanding_accuracy"] = overall
-        result.final_success = overall > 0.5
+        result.final_success = overall >= 0.7
         if not result.final_success:
             result.failure_stage = "document_understanding"
         return result
