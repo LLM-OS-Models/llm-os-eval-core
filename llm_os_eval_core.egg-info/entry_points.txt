@@ -1,0 +1,2 @@
+[console_scripts]
+llm-os-eval = llm_os_eval.cli:app

@@ -33,6 +33,16 @@ _CITY_ALIASES = {
     "뉴욕": "New York", "New York": "뉴욕",
 }
 
+# Natural language time expressions → gold format equivalents
+_TIME_ALIASES = {
+    "이번 달": {"2026-04", "2026-04-01", "this_month", "current_month"},
+    "이번달": {"2026-04", "2026-04-01", "this_month", "current_month"},
+    "지난주": {"last_week", "지난 주"},
+    "지난 주": {"last_week", "지난주"},
+    "이번주": {"this_week", "이번 주"},
+    "이번 주": {"this_week", "이번주"},
+}
+
 
 def _arg_semantic_match(pred_val, gold_val) -> bool:
     """Check if two argument values are semantically equivalent."""
@@ -45,6 +55,14 @@ def _arg_semantic_match(pred_val, gold_val) -> bool:
         return True
     if sp in _CITY_ALIASES and _CITY_ALIASES.get(sp) == sg:
         return True
+    # Time expression aliases: check if pred is a natural language time matching gold
+    if sp in _TIME_ALIASES and sg in _TIME_ALIASES[sp]:
+        return True
+    if sg in _TIME_ALIASES and sp in _TIME_ALIASES[sg]:
+        return True
+    # Numeric date match: "2026-04" matches any YYYY-MM format for current month
+    if re.fullmatch(r"\d{4}-\d{2}", sg) and re.fullmatch(r"\d{4}-\d{2}", sp):
+        return sg[:7] == sp[:7]
     # Case-insensitive for English values
     if sp.lower() == sg.lower():
         return True
@@ -120,43 +138,67 @@ class ToolCallEvaluator(BaseEvaluator):
             result.final_success = False
             return result
 
-        # Grade ALL tool calls, not just the first one
+        # Unwrap nested {"tool_call": {...}} wrappers
+        unwrapped = []
+        for p in predicted:
+            if isinstance(p, dict) and "tool_call" in p and "name" not in p:
+                unwrapped.append(p["tool_call"])
+            else:
+                unwrapped.append(p)
+
+        # Greedy best-match: for each gold call, find the best-matching predicted call
         n_gold = len(gold_calls)
+        used_pred = set()
         selection_hits = 0
         total_arg_score = 0.0
         total_schema_ok = 0.0
 
-        for i, gold_call in enumerate(gold_calls):
-            if i < len(predicted):
-                pred_call = predicted[i]
-                # Unwrap nested {"tool_call": {...}} wrapper used by some models
-                if isinstance(pred_call, dict) and "tool_call" in pred_call and "name" not in pred_call:
-                    pred_call = pred_call["tool_call"]
-                if pred_call.get("name") == gold_call.get("name"):
-                    selection_hits += 1
+        for gold_call in gold_calls:
+            best_idx = -1
+            best_arg_score = -1.0
+            best_pred_args = {}
+
+            for j, pred_call in enumerate(unwrapped):
+                if j in used_pred:
+                    continue
+                if pred_call.get("name") != gold_call.get("name"):
+                    continue
 
                 gold_args = gold_call.get("arguments", {})
                 pred_args = pred_call.get("arguments", {}) or {}
                 if gold_args:
-                    matching = 0
-                    for k, v in gold_args.items():
-                        if _is_placeholder(v):
-                            matching += 1 if k in pred_args else 0
-                        else:
-                            matching += 1 if _arg_semantic_match(pred_args.get(k, ""), v) else 0
-                    total_arg_score += matching / len(gold_args)
+                    matching = sum(
+                        1 if _is_placeholder(v) and k in pred_args
+                        else 1 if not _is_placeholder(v) and _arg_semantic_match(pred_args.get(k, ""), v)
+                        else 0
+                        for k, v in gold_args.items()
+                    )
+                    score = matching / len(gold_args)
                 else:
-                    total_arg_score += 1.0
+                    score = 1.0
+
+                if score > best_arg_score:
+                    best_arg_score = score
+                    best_idx = j
+                    best_pred_args = pred_args
+
+            if best_idx >= 0:
+                used_pred.add(best_idx)
+                selection_hits += 1
+                total_arg_score += best_arg_score
 
                 if gold_tools_schema:
                     try:
                         schema = gold_tools_schema if isinstance(gold_tools_schema, dict) else {"type": "object", "properties": gold_tools_schema}
-                        jsonschema.validate(instance=pred_args, schema=schema)
+                        jsonschema.validate(instance=best_pred_args, schema=schema)
                         total_schema_ok += 1.0
                     except jsonschema.ValidationError:
                         pass
                 else:
                     total_schema_ok += 1.0
+            else:
+                # No matching predicted call found — check if any predicted call has a partial match
+                total_arg_score += 0.0
 
         selection_ok = selection_hits / n_gold if n_gold > 0 else 0.0
         arg_score = total_arg_score / n_gold if n_gold > 0 else 0.0

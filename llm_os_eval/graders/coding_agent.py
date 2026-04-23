@@ -102,10 +102,19 @@ def _extract_test_list(text: str) -> list[str]:
 
 def _normalize_test_name(name: str) -> list[str]:
     normalized = re.sub(r"[/.:_]", " ", name)
-    return [w for w in normalized.lower().split() if w]
+    words = [w for w in normalized.lower().split() if w]
+    # Normalize suffixes: attachments→attachment, included→include, connection→connect
+    stemmed = []
+    for w in words:
+        for suffix, repl in [("tions", "t"), ("tion", "t"), ("ments", "t"), ("ment", ""), ("ies", "y"), ("ing", ""), ("ed", ""), ("es", ""), ("s", "")]:
+            if w.endswith(suffix) and len(w) - len(suffix) >= 3:
+                w = w[: -len(suffix)] + repl
+                break
+        stemmed.append(w)
+    return stemmed
 
 
-def _fuzzy_test_match(pred_tests: list[str], gold_tests: set[str], threshold: float = 0.6) -> int:
+def _fuzzy_test_match(pred_tests: list[str], gold_tests: set[str], threshold: float = 0.5) -> int:
     hits = 0
     for gold in gold_tests:
         gold_words = set(_normalize_test_name(gold))

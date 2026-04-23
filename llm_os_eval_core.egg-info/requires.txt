@@ -1,0 +1,16 @@
+pydantic>=2.8
+typer>=0.12
+rich>=13.7
+orjson>=3.10
+polars>=1.8
+pyarrow>=18.0
+httpx>=0.28
+tenacity>=9.0
+jsonschema>=4.23
+jinja2>=3.1
+
+[dev]
+pytest>=8.3
+pytest-xdist>=3.6
+ruff>=0.8
+mypy>=1.13
